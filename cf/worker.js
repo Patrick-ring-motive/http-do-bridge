@@ -1,4 +1,6 @@
-import { DurableObject } from "cloudflare:workers";
+import {
+  DurableObject
+} from "cloudflare:workers";
 const json = (body, init = {}) => {
   return new Response(JSON.stringify(body), {
     ...init,
@@ -10,8 +12,8 @@ const json = (body, init = {}) => {
   });
 };
 
-class MetaPromise{
-  constructor(){
+class MetaPromise {
+  constructor() {
     this.promise = new Promise((resolve, reject) => {
       this.resolve = resolve;
       this.reject = reject;
