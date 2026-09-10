@@ -22,16 +22,13 @@ const listen = async () => {
 	while (true) {
 		try {
 			const res = await fetch(`${BRIDGE}/listen`);
-
+            (async()=>{
 			if (!res.ok) {
 				console.warn(
 					"listen:",
 					res.status,
 					await res.text()
 				);
-
-				await sleep(1000);
-				continue;
 			}
 
 			const item = await res.json();
@@ -45,10 +42,9 @@ const listen = async () => {
 				},
 				body: JSON.stringify([response])
 			});
+			})().catch(console.warn):
 		} catch (e) {
 			console.warn("waiter:", e);
-
-			await sleep(1000);
 		}
 	}
 };
