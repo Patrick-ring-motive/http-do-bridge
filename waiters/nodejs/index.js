@@ -1,5 +1,4 @@
 const BRIDGE = process.env.BRIDGE ?? "https://example.com/bridge";
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const processRequest = async item => {
   console.log("received", item.transaction_id);
   /*
