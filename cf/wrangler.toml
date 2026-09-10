@@ -1,0 +1,11 @@
+name = "bridge"
+main = "worker.js"
+compatibility_date = "2026-09-09"
+
+[[durable_objects.bindings]]
+name = "BRIDGE"
+class_name = "Bridge"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Bridge"]
