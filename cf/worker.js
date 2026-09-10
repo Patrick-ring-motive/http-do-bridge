@@ -9,6 +9,16 @@ const json = (body, init = {}) => {
     }
   });
 };
+
+class MetaPromise{
+  constructor(){
+    this.promise = new Promise((resolve, reject) => {
+      this.resolve = resolve;
+      this.reject = reject;
+    });
+  }
+}
+
 export class Bridge extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
@@ -19,14 +29,10 @@ export class Bridge extends DurableObject {
     return this[`${new URL(request.url).pathname}`.slice(1)](request);
   }
   async listen(request) {
-    const waiter = {};
-    waiter.promise = new Promise((resolve, reject) => {
-      waiter.resolve = resolve;
-      waiter.reject = reject;
-    });
+    const waiter = new MetaPromise();
     this.waiters.add(waiter);
     try {
-      return json(await waiter?.promise);
+      return json(await waiter.promise);
     } finally {
       this.waiters.delete(waiter);
     }
@@ -43,17 +49,13 @@ export class Bridge extends DurableObject {
       transaction_created: Date.now(),
       payload
     };
-    const result = {};
-    result.promise = new Promise((resolve, reject) => {
-      result.resolve = resolve;
-      result.reject = reject;
-    });
+    const result = new MetaPromise();
     this.transactions.set(transactionId, result);
     try {
       const waiter = this.waiters.values().next().value;
       this.waiters.delete(waiter);
       waiter.resolve(transaction);
-      return json(await result?.promise);
+      return json(await result.promise);
     } finally {
       this.transactions.delete(transactionId);
     }
