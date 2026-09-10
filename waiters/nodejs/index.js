@@ -1,5 +1,5 @@
 const BRIDGE = process.env.BRIDGE ?? "https://bridge.smokestack.workers.dev";
-consy $console = console;
+const $console = console;
 const processRequest = async item => {
   $console.log("received", item.transaction_id);
   /*
