@@ -28,42 +28,16 @@ export class Bridge extends DurableObject {
       waiter.reject = reject;
     });
     this.waiters.add(waiter);
-    /*
-     * Don't let an abandoned HTTP request leave a waiter
-     * registered forever.
-     */
-    const abort = new Promise(resolve => {
-      request.signal.addEventListener("abort", resolve, {
-        once: true
-      });
-    });
     try {
-      const result = await Promise.race([
-        waiter.promise,
-        abort.then(() => null)
-      ]);
-      if (result === null) {
-        return new Response(null, {
-          status: 499
-        });
-      }
+      const result = await waiter.promise;
       return json(result);
     } finally {
       this.waiters.delete(waiter);
-      /*
-       * This is deliberately background work. The HTTP response
-       * doesn't need to wait for bookkeeping.
-       */
-      this.ctx.waitUntil(this.cleanup());
     }
   }
   async request(request) {
-    const transactionId = request.headers.get("transaction-id") ?? `transaction-${crypto.randomUUID()}`;
+    const transactionId = request.headers.get("transaction-id") || `transaction-${crypto.randomUUID()}`;
     const payload = await request.text();
-    /*
-     * Don't create a second transaction if the producer retries
-     * with the same transaction ID.
-     */
     const existing = this.transactions.get(transactionId);
     if (existing) {
       return json(await existing.promise);
@@ -84,21 +58,9 @@ export class Bridge extends DurableObject {
     this.transactions.set(transactionId, result);
     try {
       const waiter = this.waiters.values().next().value;
-      if (!waiter) {
-        this.transactions.delete(transactionId);
-        return json({
-          error: "no waiter connected"
-        }, {
-          status: 503
-        });
-      }
       this.waiters.delete(waiter);
       waiter.resolve(transaction);
       const response = await result.promise;
-      /*
-       * Nothing in the response path needs to delay the caller.
-       */
-      this.ctx.waitUntil(this.recordCompletion(transactionId));
       return json(response);
     } finally {
       this.transactions.delete(transactionId);
@@ -107,34 +69,11 @@ export class Bridge extends DurableObject {
   async response(request) {
     const items = await request.json();
     for (const item of items) {
-      const transaction = this.transactions.get(item.transaction_id);
-      if (transaction) {
-        transaction.resolve(item);
-      }
+      this?.transactions?.get?.(item?.transaction_id)?.resolve?.(item);
     }
-    /*
-     * Again, this is intentionally outside the critical response
-     * path. Add metrics/logging/etc. here later.
-     */
-    this.ctx.waitUntil(this.recordResponses(items));
     return new Response(null, {
       status: 204
     });
-  }
-  async cleanup() {
-    /*
-     * Placeholder for persistent-state cleanup once transactions
-     * move into DO SQLite.
-     */
-  }
-  async recordCompletion(transactionId) {
-    /*
-     * Placeholder for metrics/audit persistence.
-     */
-    console.log("completed", transactionId);
-  }
-  async recordResponses(items) {
-    console.log("responses", items.length);
   }
 }
 export default {
