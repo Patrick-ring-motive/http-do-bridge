@@ -19,18 +19,14 @@ export class Bridge extends DurableObject {
     return this[`${new URL(request.url).pathname}`.slice(1)](request);
   }
   async listen(request) {
-    const waiter = {
-      resolve: null,
-      reject: null
-    };
+    const waiter = {};
     waiter.promise = new Promise((resolve, reject) => {
       waiter.resolve = resolve;
       waiter.reject = reject;
     });
     this.waiters.add(waiter);
     try {
-      const result = await waiter.promise;
-      return json(result);
+      return json(await waiter?.promise);
     } finally {
       this.waiters.delete(waiter);
     }
@@ -47,10 +43,7 @@ export class Bridge extends DurableObject {
       transaction_created: Date.now(),
       payload
     };
-    const result = {
-      resolve: null,
-      reject: null
-    };
+    const result = {};
     result.promise = new Promise((resolve, reject) => {
       result.resolve = resolve;
       result.reject = reject;
@@ -60,8 +53,7 @@ export class Bridge extends DurableObject {
       const waiter = this.waiters.values().next().value;
       this.waiters.delete(waiter);
       waiter.resolve(transaction);
-      const response = await result.promise;
-      return json(response);
+      return json(await result?.promise);
     } finally {
       this.transactions.delete(transactionId);
     }
