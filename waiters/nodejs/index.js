@@ -1,6 +1,4 @@
 const BRIDGE = process.env.BRIDGE ?? "https://bridge.smokestack.workers.dev";
-const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
-
 const processRequest = async item => {
   console.log("received", item.transaction_id);
   /*
@@ -13,30 +11,28 @@ const processRequest = async item => {
   };
 };
 const listen = async () => {
+  let timer = Date.now();
   while (true) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), IDLE_TIMEOUT_MS);
-
     try {
-      const res = await fetch(`${BRIDGE}/listen`, {
-        signal: controller.signal
-      });
+      const res = await fetch(`${BRIDGE}/listen`);
       (async () => {
         const item = await res.json();
         const response = await processRequest(item);
-        await fetch(`${BRIDGE}/response`, {
+        const responseRes = await fetch(`${BRIDGE}/response`, {
           method: "POST",
           body: JSON.stringify([response])
         });
+        if(/^2/.test(responseRes.status)) {
+          console.log("response sent successfully for", item.transaction_id);
+          timer = Date.now();
+        }
       })().catch(console.warn);
     } catch (e) {
-      if (controller.signal.aborted) {
-        console.log("No requests received for 15 minutes; stopping waiter.");
-        return;
-      }
       console.warn("waiter:", e);
-    } finally {
-      clearTimeout(timeout);
+    }
+    if(Date.now() > timer + 15 * 60 * 1000) {
+      console.log("No requests received for 15 minutes; stopping waiter.");
+      return;
     }
   }
 };
