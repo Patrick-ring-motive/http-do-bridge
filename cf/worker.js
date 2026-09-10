@@ -24,6 +24,7 @@ export class Bridge extends DurableObject {
     super(ctx, env);
     this.waiters = new Set();
     this.results = new Map();
+    this.workflowCheck = null;
 
     ctx.blockConcurrencyWhile(async () => {
       this.ctx.storage.sql.exec(`
@@ -68,6 +69,63 @@ export class Bridge extends DurableObject {
       return pending;
     });
   }
+  async ensureWorkflowRunning() {
+    if (!this.workflowCheck) {
+      this.workflowCheck = this.checkAndStartWorkflow();
+    }
+
+    try {
+      await this.workflowCheck;
+    } finally {
+      this.workflowCheck = null;
+    }
+  }
+  async checkAndStartWorkflow() {
+    const repository = this.env.GITHUB_REPOSITORY;
+    const token = this.env.GITHUB_TOKEN;
+    const workflow = this.env.GITHUB_WORKFLOW || "waiter.yml";
+    const ref = this.env.GITHUB_REF || "main";
+
+    if (!repository || !token) {
+      throw new Error("GITHUB_REPOSITORY and GITHUB_TOKEN must be configured");
+    }
+
+    const encodedRepository = repository
+      .split("/")
+      .map(encodeURIComponent)
+      .join("/");
+    const encodedWorkflow = encodeURIComponent(workflow);
+    const workflowUrl = `https://api.github.com/repos/${encodedRepository}/actions/workflows/${encodedWorkflow}`;
+    const headers = {
+      "Accept": "application/vnd.github+json",
+      "Authorization": `Bearer ${token}`,
+      "User-Agent": "client-bridge-worker",
+      "X-GitHub-Api-Version": "2026-03-10"
+    };
+
+    const runsResponse = await fetch(`${workflowUrl}/runs?per_page=10`, { headers });
+    if (!runsResponse.ok) {
+      throw new Error(`GitHub workflow status check failed: ${runsResponse.status}`);
+    }
+
+    const { workflow_runs: runs = [] } = await runsResponse.json();
+    const activeStatuses = new Set(["queued", "in_progress", "waiting", "pending", "requested"]);
+    if (runs.some(run => activeStatuses.has(run.status))) {
+      return;
+    }
+
+    const dispatchResponse = await fetch(`${workflowUrl}/dispatches`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ ref })
+    });
+    if (!dispatchResponse.ok) {
+      throw new Error(`GitHub workflow dispatch failed: ${dispatchResponse.status}`);
+    }
+  }
   async listen(request) {
     const pending = this.claimPendingTransaction();
     if (pending) {
@@ -90,6 +148,9 @@ export class Bridge extends DurableObject {
       transaction_created: Date.now(),
       payload
     };
+
+    await this.ensureWorkflowRunning();
+
     const waiter = this.waiters.values().next().value;
 
     const inserted = this.ctx.storage.sql.exec(
