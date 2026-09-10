@@ -28,4 +28,4 @@ jobs:
       - name: Run waiter
         env:
           BRIDGE: ${{ vars.BRIDGE || 'https://bridge.smokestack.workers.dev' }}
-        run: node waiter.js
+        run: node waiter/nodejs/index.js
