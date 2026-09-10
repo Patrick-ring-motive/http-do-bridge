@@ -1,4 +1,4 @@
-const BRIDGE = process.env.BRIDGE ?? "https://example.com/bridge";
+const BRIDGE = process.env.BRIDGE ?? "https://bridge.smokestack.workers.dev";
 const processRequest = async item => {
   console.log("received", item.transaction_id);
   /*
