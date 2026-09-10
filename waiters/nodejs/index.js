@@ -1,6 +1,7 @@
 const BRIDGE = process.env.BRIDGE ?? "https://bridge.smokestack.workers.dev";
+consy $console = console;
 const processRequest = async item => {
-  console.log("received", item.transaction_id);
+  $console.log("received", item.transaction_id);
   /*
    * Do whatever the waiter is supposed to do.
    */
@@ -23,17 +24,17 @@ const listen = async () => {
           body: JSON.stringify([response])
         });
         if(/^2/.test(responseRes.status)) {
-          console.log("response sent successfully for", item.transaction_id);
+          $console.log("response sent successfully for", item.transaction_id);
           timer = Date.now();
         }
       })().catch(console.warn);
     } catch (e) {
-      console.warn("waiter:", e);
+      $console.warn("waiter:", e);
     }
     if(Date.now() > timer + 15 * 60 * 1000) {
-      console.log("No requests received for 15 minutes; stopping waiter.");
+      $console.log("No requests received for 15 minutes; stopping waiter.");
       return;
     }
   }
 };
-listen().catch(console.error);
+listen().catch($console.error);
