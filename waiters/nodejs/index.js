@@ -23,7 +23,7 @@ const listen = async () => {
           method: "POST",
           body: JSON.stringify([response])
         });
-        if(/^2/.test(responseRes.status)) {
+        if (/^2/.test(responseRes.status)) {
           $console.log("response sent successfully for", item.transaction_id);
           timer = Date.now();
         }
@@ -31,7 +31,7 @@ const listen = async () => {
     } catch (e) {
       $console.warn("waiter:", e);
     }
-    if(Date.now() > timer + 15 * 60 * 1000) {
+    if (Date.now() > timer + 15 * 60 * 1000) {
       $console.log("No requests received for 15 minutes; stopping waiter.");
       return;
     }
