@@ -1,4 +1,6 @@
-import { DurableObject } from "cloudflare:workers";
+import {
+  DurableObject
+} from "cloudflare:workers";
 const json = (body, init = {}) => {
   return new Response(JSON.stringify(body), {
     ...init,
@@ -10,8 +12,8 @@ const json = (body, init = {}) => {
   });
 };
 
-class MetaPromise{
-  constructor(){
+class MetaPromise {
+  constructor() {
     this.promise = new Promise((resolve, reject) => {
       this.resolve = resolve;
       this.reject = reject;
@@ -103,12 +105,16 @@ export class Bridge extends DurableObject {
       "X-GitHub-Api-Version": "2026-03-10"
     };
 
-    const runsResponse = await fetch(`${workflowUrl}/runs?per_page=10`, { headers });
+    const runsResponse = await fetch(`${workflowUrl}/runs?per_page=10`, {
+      headers
+    });
     if (!runsResponse.ok) {
       throw new Error(`GitHub workflow status check failed: ${runsResponse.status}`);
     }
 
-    const { workflow_runs: runs = [] } = await runsResponse.json();
+    const {
+      workflow_runs: runs = []
+    } = await runsResponse.json();
     const activeStatuses = new Set(["queued", "in_progress", "waiting", "pending", "requested"]);
     if (runs.some(run => activeStatuses.has(run.status))) {
       return;
@@ -120,7 +126,9 @@ export class Bridge extends DurableObject {
         ...headers,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ ref })
+      body: JSON.stringify({
+        ref
+      })
     });
     if (!dispatchResponse.ok) {
       throw new Error(`GitHub workflow dispatch failed: ${dispatchResponse.status}`);
@@ -142,7 +150,7 @@ export class Bridge extends DurableObject {
   }
   async request(request) {
     const transactionId = request.headers.get("transaction-id") || `transaction-${crypto.randomUUID()}`;
-    const payload = (await request.text())||request.url;
+    const payload = (await request.text()) || request.url;
     const transaction = {
       transaction_id: transactionId,
       transaction_created: Date.now(),
