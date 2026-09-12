@@ -38,7 +38,7 @@ const listen = async () => {
   let timer = Date.now();
   while (true) {
     try {
-      const res = await fetch(`${BRIDGE}/listen`);
+      const res = await fetch(`${BRIDGE}/listen/nodejs`);
       (async () => {
         const item = await res.json();
         const response = await processRequest(item);
