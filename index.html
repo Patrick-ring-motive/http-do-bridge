@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Node.js Runner</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/themes/prism-tomorrow.min.css">
   <style>
     :root {
       color-scheme: dark;
@@ -40,7 +41,7 @@
       line-height: 1.5;
       tab-size: 2;
     }
-    #highlight { pointer-events: none; color: #e6edf3; }
+    #highlight { pointer-events: none; color: #e6edf3; background: #161b22; text-shadow: none; }
     #editor { background: transparent; color: transparent; caret-color: white; -webkit-text-fill-color: transparent; }
     #editor::selection { background: #264f78; }
     pre { min-height: 120px; margin: 0; padding: 14px; overflow: auto; white-space: pre-wrap; line-height: 1.5; }
@@ -78,6 +79,8 @@
     <pre id="output" aria-live="polite"></pre>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-javascript.min.js"></script>
   <script>
     const endpoint = document.querySelector("#endpoint");
     const editor = document.querySelector("#editor");
@@ -107,7 +110,7 @@
     };
 
     const updateHighlight = () => {
-      highlight.innerHTML = `${colorCode(editor.value)}\n`;
+      highlight.innerHTML = `${Prism.highlight(editor.value, Prism.languages.javascript, "javascript")}\n`;
       highlight.scrollTop = editor.scrollTop;
       highlight.scrollLeft = editor.scrollLeft;
     };
