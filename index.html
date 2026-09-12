@@ -69,6 +69,7 @@
     <select id="runner">
       <option value="nodejs">Node.js</option>
       <option value="jxa">JXA</option>
+      <option value="mshta">MSHTA</option>
     </select>
 
     <label for="editor">JavaScript</label>
@@ -94,7 +95,8 @@
     const runButton = document.querySelector("#run");
     const starterCode = {
       nodejs: 'console.log("Hello from Node.js", process.version);',
-      jxa: 'ObjC.import("Foundation");\nconsole.log("Hello from JXA", ObjC.unwrap($.NSProcessInfo.processInfo.operatingSystemVersionString));'
+      jxa: 'ObjC.import("Foundation");\nconsole.log("Hello from JXA", ObjC.unwrap($.NSProcessInfo.processInfo.operatingSystemVersionString));',
+      mshta: 'var shell = new ActiveXObject("WScript.Shell");\nconsole.log("Hello from MSHTA", shell.ExpandEnvironmentStrings("%OS%"));'
     };
     const colorPattern = /([*•]+)|([{}‘’']+)|([\[\]“”"]+)|([()]+)|(\d+)|([^a-zA-Z0-9\s*•{}‘’'\[\]“”"()]+)/gu;
     const colorClasses = ["color-star", "color-curly", "color-square", "color-paren", "color-number", "color-symbol"];
