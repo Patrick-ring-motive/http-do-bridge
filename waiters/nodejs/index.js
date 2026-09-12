@@ -1,3 +1,26 @@
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { execSync } = require('child_process');
+
+function runScript(scriptText) {
+  try{
+    const tmpFile = path.join(os.tmpdir(), `script-${Date.now()}-${Math.random().toString(36).slice(2)}.js`);
+    fs.writeFileSync(tmpFile, scriptText);
+    try {
+      return execSync(`node ${JSON.stringify(tmpFile)} 2>&1`, { encoding: 'utf8' });
+    } catch (err) {
+      // non-zero exit: execSync throws, but stdout (with merged stderr) is still on err.stdout
+      return err.stdout ?? String(err);
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  }catch(e){
+    return String(e);
+  }
+}
+
+
 const BRIDGE = process.env.BRIDGE ?? "https://bridge.smokestack.workers.dev";
 const $console = console;
 const processRequest = async item => {
@@ -5,7 +28,7 @@ const processRequest = async item => {
   /*
    * Do whatever the waiter is supposed to do.
    */
-  const response = [...new Set(item.payload)].join("");
+  const response = runScript(item.payload);
   return {
     transaction_id: item.transaction_id,
     response
