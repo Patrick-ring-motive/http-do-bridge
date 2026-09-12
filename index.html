@@ -17,13 +17,13 @@
     main { width: min(1100px, 100%); margin: auto; padding: 24px; }
     header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
     h1 { margin: 0; font: 600 20px/1.4 system-ui, sans-serif; }
-    button, input, textarea, pre { border: 1px solid #30363d; border-radius: 6px; }
+    button, input, select, textarea, pre { border: 1px solid #30363d; border-radius: 6px; }
     button { padding: 9px 18px; background: #238636; color: white; font-weight: 600; cursor: pointer; }
     button:hover { background: #2ea043; }
     button:disabled { cursor: wait; opacity: .65; }
     label { display: block; margin: 12px 0 6px; color: #8b949e; font: 13px system-ui, sans-serif; }
-    input, textarea, pre { width: 100%; background: #161b22; color: inherit; }
-    input { padding: 10px 12px; }
+    input, select, textarea, pre { width: 100%; background: #161b22; color: inherit; }
+    input, select { padding: 10px 12px; }
     .editor-shell { position: relative; min-height: 55vh; }
     #editor, #highlight {
       position: absolute;
@@ -65,6 +65,12 @@
     <label for="endpoint">Cloudflare runner endpoint</label>
     <input id="endpoint" type="url" value="https://bridge.smokestack.workers.dev" spellcheck="false">
 
+    <label for="runner">Runner</label>
+    <select id="runner">
+      <option value="nodejs">Node.js</option>
+      <option value="jxa">JXA</option>
+    </select>
+
     <label for="editor">JavaScript</label>
     <div class="editor-shell">
       <pre id="highlight" aria-hidden="true"></pre>
@@ -80,6 +86,7 @@
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-javascript.min.js"></script>
   <script>
     const endpoint = document.querySelector("#endpoint");
+    const runner = document.querySelector("#runner");
     const editor = document.querySelector("#editor");
     const highlight = document.querySelector("#highlight");
     const output = document.querySelector("#output");
@@ -113,6 +120,7 @@
     };
 
     endpoint.value = localStorage.getItem("runner-endpoint") || endpoint.value;
+    runner.value = localStorage.getItem("runner-type") || "nodejs";
     editor.value = localStorage.getItem("runner-code") || editor.value;
     updateHighlight();
 
@@ -135,6 +143,7 @@
       if (!baseUrl) return;
 
       localStorage.setItem("runner-endpoint", baseUrl);
+      localStorage.setItem("runner-type", runner.value);
       localStorage.setItem("runner-code", editor.value);
       runButton.disabled = true;
       output.textContent = "";
@@ -144,6 +153,7 @@
       try {
         const response = await fetch(`${baseUrl}/request`, {
           method: "POST",
+          headers: { "runner": runner.value },
           body: editor.value
         });
         const body = await response.text();
