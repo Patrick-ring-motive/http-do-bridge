@@ -152,12 +152,14 @@
         }
 
         const result = JSON.parse(body);
-        output.textContent = result.response ?? JSON.stringify(result, null, 2);
+        const resultText = String(result.response ?? JSON.stringify(result, null, 2));
+        output.innerHTML = colorCode(resultText);
         status.textContent = "Finished";
       } catch (error) {
         status.className = "error";
         status.textContent = "Run failed";
-        output.textContent = error instanceof Error ? error.message : String(error);
+        const errorText = error instanceof Error ? error.message : String(error);
+        output.innerHTML = colorCode(errorText);
       } finally {
         runButton.disabled = false;
       }
