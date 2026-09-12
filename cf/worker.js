@@ -1,6 +1,4 @@
-import {
-  DurableObject
-} from "cloudflare:workers";
+import { DurableObject } from "cloudflare:workers";
 const json = (body, init = {}) => {
   return new Response(JSON.stringify(body), {
     ...init,
@@ -12,8 +10,8 @@ const json = (body, init = {}) => {
   });
 };
 
-class MetaPromise {
-  constructor() {
+class MetaPromise{
+  constructor(){
     this.promise = new Promise((resolve, reject) => {
       this.resolve = resolve;
       this.reject = reject;
@@ -24,9 +22,12 @@ class MetaPromise {
 export class Bridge extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
-    this.waiters = new Set();
+    this.waiters = new Map([
+      ["nodejs", new Set()],
+      ["jxa", new Set()]
+    ]);
     this.results = new Map();
-    this.workflowCheck = null;
+    this.workflowChecks = new Map();
 
     ctx.blockConcurrencyWhile(async () => {
       this.ctx.storage.sql.exec(`
@@ -34,11 +35,21 @@ export class Bridge extends DurableObject {
           transaction_id TEXT PRIMARY KEY,
           transaction_created INTEGER NOT NULL,
           payload TEXT NOT NULL,
+          runner TEXT NOT NULL DEFAULT 'nodejs',
           dispatched INTEGER NOT NULL DEFAULT 0,
           response_json TEXT
         );
-        CREATE INDEX IF NOT EXISTS idx_transactions_pending
-          ON transactions(dispatched, transaction_created)
+      `);
+      const columns = this.ctx.storage.sql.exec("PRAGMA table_info(transactions)").toArray();
+      if (!columns.some(column => column.name === "runner")) {
+        this.ctx.storage.sql.exec(
+          "ALTER TABLE transactions ADD COLUMN runner TEXT NOT NULL DEFAULT 'nodejs'"
+        );
+      }
+      this.ctx.storage.sql.exec(`
+        DROP INDEX IF EXISTS idx_transactions_pending;
+        CREATE INDEX idx_transactions_pending
+          ON transactions(runner, dispatched, transaction_created)
           WHERE response_json IS NULL;
         UPDATE transactions
           SET dispatched = 0
@@ -50,15 +61,19 @@ export class Bridge extends DurableObject {
     const handler = this[`${new URL(request.url).pathname}`.slice(1)] || this.request;
     return handler.call(this, request);
   }
-  claimPendingTransaction() {
+  getRunner(request) {
+    const runner = (request.headers.get("runner") || "nodejs").toLowerCase();
+    return runner === "nodejs" || runner === "jxa" ? runner : null;
+  }
+  claimPendingTransaction(runner) {
     return this.ctx.storage.transactionSync(() => {
       const pending = this.ctx.storage.sql.exec(`
         SELECT transaction_id, transaction_created, payload
         FROM transactions
-        WHERE dispatched = 0 AND response_json IS NULL
+        WHERE runner = ? AND dispatched = 0 AND response_json IS NULL
         ORDER BY transaction_created, transaction_id
         LIMIT 1
-      `).toArray()[0];
+      `, runner).toArray()[0];
 
       if (!pending) {
         return null;
@@ -71,21 +86,26 @@ export class Bridge extends DurableObject {
       return pending;
     });
   }
-  async ensureWorkflowRunning() {
-    if (!this.workflowCheck) {
-      this.workflowCheck = this.checkAndStartWorkflow();
+  async ensureWorkflowRunning(runner) {
+    if (!this.workflowChecks.has(runner)) {
+      this.workflowChecks.set(runner, this.checkAndStartWorkflow(runner));
     }
 
+    const workflowCheck = this.workflowChecks.get(runner);
     try {
-      await this.workflowCheck;
+      await workflowCheck;
     } finally {
-      this.workflowCheck = null;
+      if (this.workflowChecks.get(runner) === workflowCheck) {
+        this.workflowChecks.delete(runner);
+      }
     }
   }
-  async checkAndStartWorkflow() {
+  async checkAndStartWorkflow(runner) {
     const repository = this.env.GITHUB_REPOSITORY;
     const token = this.env.GITHUB_TOKEN;
-    const workflow = this.env.GITHUB_WORKFLOW || "waiter.yml";
+    const workflow = runner === "jxa"
+      ? this.env.GITHUB_JXA_WORKFLOW || "jxa-waiter.yml"
+      : this.env.GITHUB_WORKFLOW || "waiter.yml";
     const ref = this.env.GITHUB_REF || "main";
 
     if (!repository || !token) {
@@ -105,16 +125,12 @@ export class Bridge extends DurableObject {
       "X-GitHub-Api-Version": "2026-03-10"
     };
 
-    const runsResponse = await fetch(`${workflowUrl}/runs?per_page=10`, {
-      headers
-    });
+    const runsResponse = await fetch(`${workflowUrl}/runs?per_page=10`, { headers });
     if (!runsResponse.ok) {
       throw new Error(`GitHub workflow status check failed: ${runsResponse.status}`);
     }
 
-    const {
-      workflow_runs: runs = []
-    } = await runsResponse.json();
+    const { workflow_runs: runs = [] } = await runsResponse.json();
     const activeStatuses = new Set(["queued", "in_progress", "waiting", "pending", "requested"]);
     if (runs.some(run => activeStatuses.has(run.status))) {
       return;
@@ -126,49 +142,60 @@ export class Bridge extends DurableObject {
         ...headers,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        ref
-      })
+      body: JSON.stringify({ ref })
     });
     if (!dispatchResponse.ok) {
       throw new Error(`GitHub workflow dispatch failed: ${dispatchResponse.status}`);
     }
   }
   async listen(request) {
-    const pending = this.claimPendingTransaction();
+    const runner = this.getRunner(request);
+    if (!runner) {
+      return json({ error: "runner header must be nodejs or jxa" }, { status: 400 });
+    }
+
+    const pending = this.claimPendingTransaction(runner);
     if (pending) {
       return json(pending);
     }
 
     const waiter = new MetaPromise();
-    this.waiters.add(waiter);
+    const waiters = this.waiters.get(runner);
+    waiters.add(waiter);
     try {
       return json(await waiter.promise);
     } finally {
-      this.waiters.delete(waiter);
+      waiters.delete(waiter);
     }
   }
   async request(request) {
+    const runner = this.getRunner(request);
+    if (!runner) {
+      return json({ error: "runner header must be nodejs or jxa" }, { status: 400 });
+    }
+
     const transactionId = request.headers.get("transaction-id") || `transaction-${crypto.randomUUID()}`;
-    const payload = (await request.text()) || request.url;
+    const payload = (await request.text())||request.url;
     const transaction = {
       transaction_id: transactionId,
       transaction_created: Date.now(),
       payload
     };
 
-    await this.ensureWorkflowRunning();
+    await this.ensureWorkflowRunning(runner);
 
-    const waiter = this.waiters.values().next().value;
+    const waiters = this.waiters.get(runner);
+    const waiter = waiters.values().next().value;
 
     const inserted = this.ctx.storage.sql.exec(
       `INSERT OR IGNORE INTO transactions
-        (transaction_id, transaction_created, payload, dispatched)
-       VALUES (?, ?, ?, ?)
+        (transaction_id, transaction_created, payload, runner, dispatched)
+       VALUES (?, ?, ?, ?, ?)
        RETURNING transaction_id`,
       transactionId,
       transaction.transaction_created,
       payload,
+      runner,
       waiter ? 1 : 0
     ).toArray().length > 0;
 
@@ -187,7 +214,7 @@ export class Bridge extends DurableObject {
     }
 
     if (inserted && waiter) {
-      this.waiters.delete(waiter);
+      waiters.delete(waiter);
       waiter.resolve(transaction);
     }
 
