@@ -1,4 +1,4 @@
-ObjC.import("Foundation");
+ObjC.import("Cocoa");
 
 function run(command, args) {
   const task = $.NSTask.alloc.init;
