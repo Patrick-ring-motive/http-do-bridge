@@ -67,7 +67,12 @@ function listen() {
 
   while (true) {
     try {
-      const listenResult = run("/usr/bin/curl", ["--silent", "--show-error", "--fail", BRIDGE + "/listen"]);
+      const listenResult = run("/usr/bin/curl", [
+        "--silent",
+        "--show-error",
+        "--fail",
+        BRIDGE + "/listen/jxa"
+      ]);
       if (listenResult.status !== 0) {
         throw new Error(listenResult.output);
       }
