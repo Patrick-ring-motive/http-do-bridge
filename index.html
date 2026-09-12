@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Node.js Runner</title>
+  <title>JavaScript Runner</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/themes/prism-tomorrow.min.css">
   <style>
     :root {
@@ -59,7 +59,7 @@
 <body>
   <main>
     <header>
-      <h1>Node.js Runner</h1>
+      <h1>JavaScript Runner</h1>
       <button id="run" type="button">Run</button>
     </header>
     <label for="endpoint">Cloudflare runner endpoint</label>
@@ -92,6 +92,10 @@
     const output = document.querySelector("#output");
     const status = document.querySelector("#status");
     const runButton = document.querySelector("#run");
+    const starterCode = {
+      nodejs: 'console.log("Hello from Node.js", process.version);',
+      jxa: 'ObjC.import("Foundation");\nconsole.log("Hello from JXA", ObjC.unwrap($.NSProcessInfo.processInfo.operatingSystemVersionString));'
+    };
     const colorPattern = /([*•]+)|([{}‘’']+)|([\[\]“”"]+)|([()]+)|(\d+)|([^a-zA-Z0-9\s*•{}‘’'\[\]“”"()]+)/gu;
     const colorClasses = ["color-star", "color-curly", "color-square", "color-paren", "color-number", "color-symbol"];
 
@@ -121,9 +125,18 @@
 
     endpoint.value = localStorage.getItem("runner-endpoint") || endpoint.value;
     runner.value = localStorage.getItem("runner-type") || "nodejs";
-    editor.value = localStorage.getItem("runner-code") || editor.value;
+    const savedCode = localStorage.getItem("runner-code");
+    editor.value = savedCode && !Object.values(starterCode).includes(savedCode)
+      ? savedCode
+      : starterCode[runner.value];
     updateHighlight();
 
+    runner.addEventListener("change", () => {
+      if (Object.values(starterCode).includes(editor.value)) {
+        editor.value = starterCode[runner.value];
+        updateHighlight();
+      }
+    });
     editor.addEventListener("input", updateHighlight);
     editor.addEventListener("scroll", updateHighlight);
     editor.addEventListener("keydown", event => {
