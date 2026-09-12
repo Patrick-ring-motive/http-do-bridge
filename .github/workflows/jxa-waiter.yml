@@ -1,0 +1,26 @@
+name: JXA Waiter
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jxa-waiter
+  cancel-in-progress: true
+
+jobs:
+  run-waiter:
+    runs-on: macos-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Run JXA waiter
+        env:
+          BRIDGE: ${{ vars.BRIDGE || 'https://bridge.smokestack.workers.dev' }}
+        run: osascript -l JavaScript waiters/jxa/waiter.js
