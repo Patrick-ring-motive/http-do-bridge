@@ -18,7 +18,10 @@ function run(command, args) {
       output: ObjC.unwrap($.NSString.alloc.initWithDataEncoding(data, $.NSUTF8StringEncoding)) || ""
     };
   } catch (error) {
-    return { status: -1, output: String(error) };
+    return {
+      status: -1,
+      output: String(error)
+    };
   }
 }
 
@@ -42,12 +45,12 @@ function httpRequest(method, url, body) {
 
   const result = run("/usr/bin/curl", args);
   const markerIndex = result.output.lastIndexOf(statusMarker);
-  const responseBody = markerIndex === -1
-    ? result.output
-    : result.output.slice(0, markerIndex);
-  const status = markerIndex === -1
-    ? 0
-    : Number(result.output.slice(markerIndex + statusMarker.length).trim());
+  const responseBody = markerIndex === -1 ?
+    result.output :
+    result.output.slice(0, markerIndex);
+  const status = markerIndex === -1 ?
+    0 :
+    Number(result.output.slice(markerIndex + statusMarker.length).trim());
 
   if (result.status !== 0) {
     throw new Error(`curl exited with ${result.status}: ${responseBody}`);
