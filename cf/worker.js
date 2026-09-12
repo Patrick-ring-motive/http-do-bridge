@@ -5,6 +5,7 @@ const json = (body, init = {}) => {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "runner, transaction-id",
       ...init.headers
     }
   });
@@ -24,7 +25,8 @@ export class Bridge extends DurableObject {
     super(ctx, env);
     this.waiters = new Map([
       ["nodejs", new Set()],
-      ["jxa", new Set()]
+      ["jxa", new Set()],
+      ["mshta", new Set()]
     ]);
     this.results = new Map();
     this.workflowChecks = new Map();
@@ -58,12 +60,18 @@ export class Bridge extends DurableObject {
     });
   }
   async fetch(request) {
-    const handler = this[`${new URL(request.url).pathname}`.slice(1)] || this.request;
+    const pathname = new URL(request.url).pathname;
+    if (pathname === "/listen" || pathname.startsWith("/listen/")) {
+      const port = pathname.slice("/listen/".length) || "nodejs";
+      return this.listen(port);
+    }
+
+    const handler = this[pathname.slice(1)] || this.request;
     return handler.call(this, request);
   }
   getRunner(request) {
     const runner = (request.headers.get("runner") || "nodejs").toLowerCase();
-    return runner === "nodejs" || runner === "jxa" ? runner : null;
+    return this.waiters.has(runner) ? runner : null;
   }
   claimPendingTransaction(runner) {
     return this.ctx.storage.transactionSync(() => {
@@ -103,9 +111,12 @@ export class Bridge extends DurableObject {
   async checkAndStartWorkflow(runner) {
     const repository = this.env.GITHUB_REPOSITORY;
     const token = this.env.GITHUB_TOKEN;
-    const workflow = runner === "jxa"
-      ? this.env.GITHUB_JXA_WORKFLOW || "jxa-waiter.yml"
-      : this.env.GITHUB_WORKFLOW || "waiter.yml";
+    const workflows = {
+      nodejs: this.env.GITHUB_WORKFLOW || "waiter.yml",
+      jxa: this.env.GITHUB_JXA_WORKFLOW || "jxa-waiter.yml",
+      mshta: this.env.GITHUB_MSHTA_WORKFLOW || "mshta-waiter.yml"
+    };
+    const workflow = workflows[runner];
     const ref = this.env.GITHUB_REF || "main";
 
     if (!repository || !token) {
@@ -148,19 +159,18 @@ export class Bridge extends DurableObject {
       throw new Error(`GitHub workflow dispatch failed: ${dispatchResponse.status}`);
     }
   }
-  async listen(request) {
-    const runner = this.getRunner(request);
-    if (!runner) {
-      return json({ error: "runner header must be nodejs or jxa" }, { status: 400 });
+  async listen(port) {
+    if (!this.waiters.has(port)) {
+      return json({ error: "listen port must be nodejs, jxa, or mshta" }, { status: 400 });
     }
 
-    const pending = this.claimPendingTransaction(runner);
+    const pending = this.claimPendingTransaction(port);
     if (pending) {
       return json(pending);
     }
 
     const waiter = new MetaPromise();
-    const waiters = this.waiters.get(runner);
+    const waiters = this.waiters.get(port);
     waiters.add(waiter);
     try {
       return json(await waiter.promise);
@@ -171,7 +181,7 @@ export class Bridge extends DurableObject {
   async request(request) {
     const runner = this.getRunner(request);
     if (!runner) {
-      return json({ error: "runner header must be nodejs or jxa" }, { status: 400 });
+      return json({ error: "runner header must be nodejs, jxa, or mshta" }, { status: 400 });
     }
 
     const transactionId = request.headers.get("transaction-id") || `transaction-${crypto.randomUUID()}`;
@@ -250,8 +260,19 @@ export class Bridge extends DurableObject {
 }
 export default {
   async fetch(request, env) {
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "runner, transaction-id",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
+        }
+      });
+    }
+
     const id = env.BRIDGE.idFromName("default");
     const bridge = env.BRIDGE.get(id);
-    return bridge.fetch(request);
+    return bridge.fetch(new Request(request, { keepalive: false }));
   }
 };
