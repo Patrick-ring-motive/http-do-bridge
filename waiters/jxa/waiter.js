@@ -1,4 +1,4 @@
-ObjC.import("Cocoa");
+ObjC.import("Foundation");
 
 function run(command, args) {
   const task = $.NSTask.alloc.init;
@@ -23,97 +23,39 @@ function run(command, args) {
 }
 
 function httpRequest(method, url, body) {
-  const request = $.NSMutableURLRequest.alloc.initWithURL($.NSURL.URLWithString(url));
-  request.HTTPMethod = method;
-  request.timeoutInterval = 910;
+  const statusMarker = "\n__HTTP_STATUS__:";
+  const args = [
+    "--silent",
+    "--show-error",
+    "--max-time", "910",
+    "--request", method,
+    "--write-out", statusMarker + "%{http_code}"
+  ];
+
   if (body !== undefined) {
-    request.setValueForHTTPHeaderField("application/json", "Content-Type");
-    request.HTTPBody = $.NSString.stringWithString(JSON.stringify(body))
-      .dataUsingEncoding($.NSUTF8StringEncoding);
-  }
-
-  const response = Ref();
-  const error = Ref();
-  const data = $.NSURLConnection.sendSynchronousRequestReturningResponseError(
-    request,
-    response,
-    error
-  );
-  if (!data) {
-    throw new Error(error[0] ? ObjC.unwrap(error[0].localizedDescription) : "WebDriver request failed");
-  }
-
-  const status = Number(response[0].statusCode);
-  const text = ObjC.unwrap($.NSString.alloc.initWithDataEncoding(data, $.NSUTF8StringEncoding)) || "";
-  const result = text ? JSON.parse(text) : { value: null };
-  if (status < 200 || status >= 300 || result.value?.error) {
-    throw new Error(result.value?.message || `WebDriver returned HTTP ${status}`);
-  }
-  return result.value;
-}
-
-class SafariWebDriver {
-  constructor(port) {
-    this.baseUrl = `http://127.0.0.1:${port}`;
-    this.driver = $.NSTask.alloc.init;
-    this.driver.launchPath = "/usr/bin/safaridriver";
-    this.driver.arguments = ["--port", String(port)];
-    this.driver.standardOutput = $.NSPipe.pipe;
-    this.driver.standardError = this.driver.standardOutput;
-    this.driver.launch;
-
-    let lastError;
-    for (let attempt = 0; attempt < 50; attempt += 1) {
-      try {
-        const value = httpRequest("POST", `${this.baseUrl}/session`, {
-          capabilities: { alwaysMatch: { browserName: "safari" } }
-        });
-        this.sessionId = value.sessionId;
-        httpRequest("POST", `${this.baseUrl}/session/${this.sessionId}/timeouts`, {
-          script: 900000
-        });
-        return;
-      } catch (error) {
-        lastError = error;
-        $.NSThread.sleepForTimeInterval(0.1);
-      }
-    }
-    this.driver.terminate;
-    throw lastError || new Error("Safari WebDriver failed to start");
-  }
-
-  fetch(url, options) {
-    return httpRequest(
-      "POST",
-      `${this.baseUrl}/session/${this.sessionId}/execute/async`,
-      {
-        script: `
-          const url = arguments[0];
-          const options = arguments[1];
-          const done = arguments[arguments.length - 1];
-          fetch(url, options)
-            .then(async response => done({
-              ok: response.ok,
-              status: response.status,
-              body: await response.text()
-            }))
-            .catch(error => done({ error: String(error) }));
-        `,
-        args: [url, options || {}]
-      }
+    args.push(
+      "--header", "Content-Type: application/json",
+      "--data-binary", JSON.stringify(body)
     );
   }
+  args.push(url);
 
-  close() {
-    if (this.sessionId) {
-      try {
-        httpRequest("DELETE", `${this.baseUrl}/session/${this.sessionId}`);
-      } catch (_) {}
-    }
-    if (this.driver.running) {
-      this.driver.terminate;
-    }
+  const result = run("/usr/bin/curl", args);
+  const markerIndex = result.output.lastIndexOf(statusMarker);
+  const responseBody = markerIndex === -1
+    ? result.output
+    : result.output.slice(0, markerIndex);
+  const status = markerIndex === -1
+    ? 0
+    : Number(result.output.slice(markerIndex + statusMarker.length).trim());
+
+  if (result.status !== 0) {
+    throw new Error(`curl exited with ${result.status}: ${responseBody}`);
   }
+  if (status < 200 || status >= 300) {
+    throw new Error(`Bridge returned HTTP ${status}: ${responseBody}`);
+  }
+  return responseBody;
 }
 
 function runScript(scriptText) {
@@ -158,41 +100,23 @@ function processRequest(item) {
 
 function listen() {
   let timer = Date.now();
-  const webDriver = new SafariWebDriver(4444);
+  while (true) {
+    try {
+      const item = JSON.parse(httpRequest("GET", BRIDGE + "/listen/jxa"));
+      const response = processRequest(item);
+      httpRequest("POST", BRIDGE + "/response", [response]);
 
-  try {
-    while (true) {
-      try {
-        const listenResult = webDriver.fetch(BRIDGE + "/listen/jxa");
-        if (listenResult.error || !listenResult.ok) {
-          throw new Error(listenResult.error || `Listen returned HTTP ${listenResult.status}`);
-        }
-
-        const item = JSON.parse(listenResult.body);
-        const response = processRequest(item);
-        const responseResult = webDriver.fetch(BRIDGE + "/response", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify([response])
-        });
-
-        if (responseResult.error || !responseResult.ok) {
-          throw new Error(responseResult.error || `Response returned HTTP ${responseResult.status}`);
-        }
-
-        log("response sent successfully for", item.transaction_id);
-        timer = Date.now();
-      } catch (error) {
-        console.log("waiter: " + String(error));
-      }
-
-      if (Date.now() > timer + 15 * 60 * 1000) {
-        log("No requests received for 15 minutes; stopping waiter.");
-        return;
-      }
+      log("response sent successfully for", item.transaction_id);
+      timer = Date.now();
+    } catch (error) {
+      console.log("waiter: " + String(error));
+      $.NSThread.sleepForTimeInterval(1);
     }
-  } finally {
-    webDriver.close();
+
+    if (Date.now() > timer + 15 * 60 * 1000) {
+      log("No requests received for 15 minutes; stopping waiter.");
+      return;
+    }
   }
 }
 
