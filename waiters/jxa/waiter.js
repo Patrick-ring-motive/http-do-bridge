@@ -23,7 +23,7 @@ function run(command, args) {
 }
 
 function httpRequest(method, url, body) {
-  const request = $.NSMutableURLRequest.requestWithURL($.NSURL.URLWithString(url));
+  const request = $.NSMutableURLRequest.alloc.initWithURL($.NSURL.URLWithString(url));
   request.HTTPMethod = method;
   request.timeoutInterval = 910;
   if (body !== undefined) {
