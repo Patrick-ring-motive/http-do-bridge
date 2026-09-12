@@ -93,10 +93,11 @@
     const output = document.querySelector("#output");
     const status = document.querySelector("#status");
     const runButton = document.querySelector("#run");
+    const legacyMshtaStarter = 'var shell = new ActiveXObject("WScript.Shell");\nconsole.log("Hello from MSHTA", shell.ExpandEnvironmentStrings("%OS%"));';
     const starterCode = {
       nodejs: 'console.log("Hello from Node.js", process.version);',
       jxa: 'ObjC.import("Foundation");\nconsole.log("Hello from JXA", ObjC.unwrap($.NSProcessInfo.processInfo.operatingSystemVersionString));',
-      mshta: 'var shell = new ActiveXObject("WScript.Shell");\nconsole.log("Hello from MSHTA", shell.ExpandEnvironmentStrings("%OS%"));'
+      mshta: '<!doctype html>\n<html>\n<head>\n  <meta http-equiv="X-UA-Compatible" content="IE=9">\n  <title>MSHTA Script</title>\n  <hta:application showintaskbar="no" windowstate="minimize" />\n  <script language="JScript">\n    var shell = new ActiveXObject("WScript.Shell");\n    console.log("Hello from MSHTA", shell.ExpandEnvironmentStrings("%OS%"));\n  <\/script>\n</head>\n<body></body>\n</html>'
     };
     const colorPattern = /([*•]+)|([{}‘’']+)|([\[\]“”"]+)|([()]+)|(\d+)|([^a-zA-Z0-9\s*•{}‘’'\[\]“”"()]+)/gu;
     const colorClasses = ["color-star", "color-curly", "color-square", "color-paren", "color-number", "color-symbol"];
@@ -128,7 +129,7 @@
     endpoint.value = localStorage.getItem("runner-endpoint") || endpoint.value;
     runner.value = localStorage.getItem("runner-type") || "nodejs";
     const savedCode = localStorage.getItem("runner-code");
-    editor.value = savedCode && !Object.values(starterCode).includes(savedCode)
+    editor.value = savedCode && savedCode !== legacyMshtaStarter && !Object.values(starterCode).includes(savedCode)
       ? savedCode
       : starterCode[runner.value];
     updateHighlight();
