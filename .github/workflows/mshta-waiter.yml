@@ -25,7 +25,22 @@ jobs:
         with:
           node-version: 24
 
-      - name: Run MSHTA waiter
+      - name: Locate or install Debugging Tools for Windows
+        shell: pwsh
+        run: |
+          $cdb = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $cdb) {
+            Invoke-WebRequest "https://go.microsoft.com/fwlink/?linkid=2289980" -OutFile "$env:RUNNER_TEMP\winsdksetup.exe"
+            Start-Process "$env:RUNNER_TEMP\winsdksetup.exe" -ArgumentList "/features OptionId.WindowsDesktopDebuggers /quiet /norestart" -Wait
+            $cdb = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe" -ErrorAction Stop | Select-Object -First 1
+          }
+          $cdb.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Run Windows waiters
+        shell: pwsh
         env:
           BRIDGE: ${{ vars.BRIDGE || 'https://bridge.smokestack.workers.dev' }}
-        run: node waiters/mshta/waiter.js
+        run: |
+          $mshta = Start-Process node -ArgumentList "waiters/mshta/waiter.js" -NoNewWindow -PassThru
+          $cdb = Start-Process node -ArgumentList "waiters/cdb/waiter.js" -NoNewWindow -PassThru
+          Wait-Process -Id $mshta.Id, $cdb.Id
