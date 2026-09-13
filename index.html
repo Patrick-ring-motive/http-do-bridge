@@ -1,6 +1,5 @@
 <!doctype html>
 <html lang="en">
-
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,89 +12,20 @@
       background: #0d1117;
       color: #e6edf3;
     }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-    }
-
-    main {
-      width: min(1100px, 100%);
-      margin: auto;
-      padding: 24px;
-    }
-
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-
-    h1 {
-      margin: 0;
-      font: 600 20px/1.4 system-ui, sans-serif;
-    }
-
-    button,
-    input,
-    select,
-    textarea,
-    pre {
-      border: 1px solid #30363d;
-      border-radius: 6px;
-    }
-
-    button {
-      padding: 9px 18px;
-      background: #238636;
-      color: white;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #2ea043;
-    }
-
-    button:disabled {
-      cursor: wait;
-      opacity: .65;
-    }
-
-    label {
-      display: block;
-      margin: 12px 0 6px;
-      color: #8b949e;
-      font: 13px system-ui, sans-serif;
-    }
-
-    input,
-    select,
-    textarea,
-    pre {
-      width: 100%;
-      background: #161b22;
-      color: inherit;
-    }
-
-    input,
-    select {
-      padding: 10px 12px;
-    }
-
-    .editor-shell {
-      position: relative;
-      min-height: 55vh;
-    }
-
-    #editor,
-    #highlight {
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    main { width: min(1100px, 100%); margin: auto; padding: 24px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+    h1 { margin: 0; font: 600 20px/1.4 system-ui, sans-serif; }
+    button, input, select, textarea, pre { border: 1px solid #30363d; border-radius: 6px; }
+    button { padding: 9px 18px; background: #238636; color: white; font-weight: 600; cursor: pointer; }
+    button:hover { background: #2ea043; }
+    button:disabled { cursor: wait; opacity: .65; }
+    label { display: block; margin: 12px 0 6px; color: #8b949e; font: 13px system-ui, sans-serif; }
+    input, select, textarea, pre { width: 100%; background: #161b22; color: inherit; }
+    input, select { padding: 10px 12px; }
+    .editor-shell { position: relative; min-height: 55vh; }
+    #editor, #highlight {
       position: absolute;
       inset: 0;
       min-height: 55vh;
@@ -111,76 +41,21 @@
       line-height: 1.5;
       tab-size: 2;
     }
-
-    #highlight {
-      pointer-events: none;
-      color: #e6edf3;
-      background: #161b22;
-      text-shadow: none;
-    }
-
-    #editor {
-      background: transparent;
-      color: transparent;
-      caret-color: white;
-      -webkit-text-fill-color: transparent;
-    }
-
-    #editor::selection {
-      background: #264f78;
-    }
-
-    pre {
-      min-height: 120px;
-      margin: 0;
-      padding: 14px;
-      overflow: auto;
-      white-space: pre-wrap;
-      line-height: 1.5;
-    }
-
-    .color-star {
-      color: cornflowerblue;
-    }
-
-    .color-curly {
-      color: #ff79c6;
-    }
-
-    .color-square {
-      color: #ba7dff;
-    }
-
-    .color-paren {
-      color: orange;
-    }
-
-    .color-number {
-      color: deepskyblue;
-    }
-
-    .color-symbol {
-      color: #00ff00;
-    }
-
-    #status {
-      min-height: 20px;
-      color: #8b949e;
-      font: 13px system-ui, sans-serif;
-    }
-
-    .error {
-      color: red !important;
-    }
-
-    .warning {
-      color: yellow;
-      font: 13px/1.4 system-ui, sans-serif;
-    }
-
+    #highlight { pointer-events: none; color: #e6edf3; background: #161b22; text-shadow: none; }
+    #editor { background: transparent; color: transparent; caret-color: white; -webkit-text-fill-color: transparent; }
+    #editor::selection { background: #264f78; }
+    pre { min-height: 120px; margin: 0; padding: 14px; overflow: auto; white-space: pre-wrap; line-height: 1.5; }
+    .color-star { color: cornflowerblue; }
+    .color-curly { color: #ff79c6; }
+    .color-square { color: #ba7dff; }
+    .color-paren { color: orange; }
+    .color-number { color: deepskyblue; }
+    .color-symbol { color: #00ff00; }
+    #status { min-height: 20px; color: #8b949e; font: 13px system-ui, sans-serif; }
+    .error { color: red !important; }
+    .warning { color: yellow; font: 13px/1.4 system-ui, sans-serif; }
   </style>
 </head>
-
 <body>
   <main>
     <header>
@@ -195,6 +70,7 @@
       <option value="nodejs">Node.js</option>
       <option value="jxa">JXA</option>
       <option value="mshta">MSHTA</option>
+      <option value="cdb">CDB / WinDbg</option>
     </select>
 
     <label for="editor">JavaScript</label>
@@ -222,7 +98,8 @@
     const starterCode = {
       nodejs: 'console.log("Hello from Node.js", process.version);',
       jxa: 'ObjC.import("Foundation");\nconsole.log("Hello from JXA", ObjC.unwrap($.NSProcessInfo.processInfo.operatingSystemVersionString));',
-      mshta: '<!doctype html>\n<html>\n<head>\n  <meta http-equiv="X-UA-Compatible" content="IE=9">\n  <title>MSHTA Script</title>\n  <hta:application showintaskbar="no" windowstate="minimize" />\n  <script language="JScript">\n    var shell = new ActiveXObject("WScript.Shell");\n    console.log("Hello from MSHTA", shell.ExpandEnvironmentStrings("%OS%"));\n  <\/script>\n</head>\n<body></body>\n</html>'
+      mshta: '<!doctype html>\n<html>\n<head>\n  <meta http-equiv="X-UA-Compatible" content="IE=9">\n  <title>MSHTA Script</title>\n  <hta:application showintaskbar="no" windowstate="minimize" />\n  <script language="JScript">\n    var shell = new ActiveXObject("WScript.Shell");\n    console.log("Hello from MSHTA", shell.ExpandEnvironmentStrings("%OS%"));\n  <\/script>\n</head>\n<body></body>\n</html>',
+      cdb: '"use strict";\n\nfunction invokeScript() {\n  var process = host.currentProcess;\n  host.diagnostics.debugLog("Process: ", process.Name, "\\n");\n  host.diagnostics.debugLog("Threads: ", process.Threads.Count(), "\\n");\n}'
     };
     const colorPattern = /([*•]+)|([{}‘’']+)|([\[\]“”"]+)|([()]+)|(\d+)|([^a-zA-Z0-9\s*•{}‘’'\[\]“”"()]+)/gu;
     const colorClasses = ["color-star", "color-curly", "color-square", "color-paren", "color-number", "color-symbol"];
@@ -254,9 +131,9 @@
     endpoint.value = localStorage.getItem("runner-endpoint") || endpoint.value;
     runner.value = localStorage.getItem("runner-type") || "nodejs";
     const savedCode = localStorage.getItem("runner-code");
-    editor.value = savedCode && savedCode !== legacyMshtaStarter && !Object.values(starterCode).includes(savedCode) ?
-      savedCode :
-      starterCode[runner.value];
+    editor.value = savedCode && savedCode !== legacyMshtaStarter && !Object.values(starterCode).includes(savedCode)
+      ? savedCode
+      : starterCode[runner.value];
     updateHighlight();
 
     runner.addEventListener("change", () => {
@@ -294,9 +171,7 @@
       try {
         const response = await fetch(`${baseUrl}/request`, {
           method: "POST",
-          headers: {
-            "runner": runner.value
-          },
+          headers: { "runner": runner.value },
           body: editor.value
         });
         const body = await response.text();
@@ -319,8 +194,6 @@
     }
 
     runButton.addEventListener("click", run);
-
   </script>
 </body>
-
 </html>
