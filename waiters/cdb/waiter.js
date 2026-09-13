@@ -1,8 +1,12 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { spawnSync } = require("child_process");
-const { randomUUID } = require("crypto");
+const {
+  spawnSync
+} = require("child_process");
+const {
+  randomUUID
+} = require("crypto");
 
 const BRIDGE = process.env.BRIDGE || "https://bridge.smokestack.workers.dev";
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
@@ -30,14 +34,18 @@ function runScript(scriptText) {
   } catch (error) {
     return String(error);
   } finally {
-    fs.rmSync(scriptPath, { force: true });
+    fs.rmSync(scriptPath, {
+      force: true
+    });
   }
 }
 
 async function httpRequest(method, pathname, body) {
   const response = await fetch(`${BRIDGE}${pathname}`, {
     method,
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    headers: body === undefined ? undefined : {
+      "Content-Type": "application/json"
+    },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const text = await response.text();
